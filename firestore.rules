@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  match /spaces/{scope}/games/{game} {
+   function signedIn(){return request.auth != null;}
+   function owner(){return signedIn() && resource.data.owner == request.auth.uid;}
+   function eventAfter(){return getAfter(/databases/$(database)/documents/spaces/$(scope)/games/$(game)/events/$(request.resource.data.lastEvent)).data;}
+   allow read: if owner();
+   allow create: if signedIn() && request.resource.data.keys().hasOnly(['owner','revision','lastEvent']) && request.resource.data.owner == request.auth.uid && request.resource.data.revision == 0 && eventAfter().revision == 0 && eventAfter().action.type == 'begin';
+   allow update: if owner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['revision','lastEvent']) && request.resource.data.revision == resource.data.revision + 1 && eventAfter().revision == request.resource.data.revision;
+   allow delete: if false;
+   match /events/{event} {
+    function head(){return get(/databases/$(database)/documents/spaces/$(scope)/games/$(game)).data;}
+    function after(){return getAfter(/databases/$(database)/documents/spaces/$(scope)/games/$(game)).data;}
+    allow read: if request.auth != null && head().owner == request.auth.uid;
+    allow create: if request.auth != null && after().owner == request.auth.uid && after().lastEvent == event && after().revision == request.resource.data.revision
+     && request.resource.data.keys().hasOnly(['id','revision','actor','action']) && request.resource.data.id == event && request.resource.data.actor in [0,1]
+     && request.resource.data.revision is int
+     && ((request.resource.data.revision == 0 && request.resource.data.actor == 0 && request.resource.data.action.keys().hasOnly(['type','protocol','source','seed']) && request.resource.data.action.type == 'begin' && request.resource.data.action.protocol == 1 && request.resource.data.action.source == 'digital' && request.resource.data.action.seed is int && request.resource.data.action.seed >= 0 && request.resource.data.action.seed <= 4294967295)
+      || (request.resource.data.revision > 0 && request.resource.data.revision == head().revision + 1
+       && ((request.resource.data.action.type in ['roll','bank','next'] && request.resource.data.action.keys().hasOnly(['type']))
+        || (request.resource.data.action.type == 'keep' && request.resource.data.action.keys().hasOnly(['type','dice']) && request.resource.data.action.dice is list && request.resource.data.action.dice.size() > 0 && request.resource.data.action.dice.size() <= 7))));
+    allow update,delete: if false;
+   }
+  }
+ }
+}
