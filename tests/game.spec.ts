@@ -65,7 +65,9 @@ test('save status waits for Firestore acknowledgment before reporting success',a
  await seeded(page);await expect(page.getByRole('status')).toContainText('Saved to Firebase · 1 actions');
  let acknowledge=()=>{};const gate=new Promise<void>(resolve=>acknowledge=resolve);
  await page.route('**/documents:commit*',async route=>{await gate;await route.continue();});
+ const commit=page.waitForRequest('**/documents:commit*');
  await page.getByRole('button',{name:'Roll 7 dice',exact:true}).click();
+ await commit;
  await expect(page.getByRole('status')).toHaveText('Saving to Firebase…');
  await expect(page.getByRole('button',{name:'Roll 7 dice',exact:true})).toBeDisabled();
  acknowledge();await expect(page.getByRole('status')).toContainText('Saved to Firebase · 2 actions');
