@@ -8,7 +8,7 @@
  let repo:GameRepository|undefined=$state(),events:Event[]=$state([]),gameId=$state(''),pending=$state(false),error=$state(''),selected:number[]=$state([]),readOnly=$state(false),history=$state(false);
  let unsubscribe=()=>{};
  let saveStatus=$state<'loading'|'saving'|'saved'|'cached'|'error'>('loading');
- const saveLabel=$derived(readOnly?'Read-only replay':saveStatus==='error'?'Firebase save unavailable':pending||saveStatus==='saving'?'Saving to Firebase…':saveStatus==='saved'?`Saved to Firebase · ${events.length} actions`:saveStatus==='cached'?'Offline · showing cached game':'Connecting to Firebase…');
+ const saveLabel=$derived(readOnly?'Read-only replay':saveStatus==='error'?'Firebase save unavailable':pending||saveStatus==='saving'?'Saving to Firebase…':saveStatus==='saved'?`Saved to Firebase · ${events.length} actions`:saveStatus==='cached'?'Cached game · awaiting Firebase':'Connecting to Firebase…');
  const game:State|undefined=$derived(events.length?replay(events):undefined);
  const hint=$derived(game?scoringHint(game.dice):undefined);
  const human=$derived(game?.active===0&&game.phase!=='over'&&!readOnly);
