@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.svelte-kit/
+test-results/
+playwright-report/
+.DS_Store
+artifacts/
+.env
+.env.*
+!.env.example
+.data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
