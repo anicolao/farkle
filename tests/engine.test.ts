@@ -35,3 +35,9 @@ test('replay rejects gaps, duplicate IDs, wrong actors and unknown protocol',()=
  expect(()=>replay([e,{id:'b',revision:2,actor:0,action:{type:'roll'}}])).toThrow();expect(()=>replay([e,{id:'a',revision:1,actor:0,action:{type:'roll'}}])).toThrow();expect(()=>replay([e,{id:'b',revision:1,actor:1,action:{type:'roll'}}])).toThrow();expect(()=>replay([{...e,action:{...e.action,protocol:2} as never}])).toThrow();
 });
 test('option enumeration never allows a non-scoring subset',()=>{const dice=[1,2,2,2,5,6,6].map((value,id)=>({id,value}));for(const option of options(dice))expect(score(dice.filter(d=>option.dice.includes(d.id)).map(d=>d.value))).toBe(option.points);});
+
+test('the reported roll scores three pairs, leaving the unscoring sixth face',async()=>{
+ const {scoringHint}=await import('../src/game/scoring-hint');const dice=[3,2,4,4,2,3,6].map((value,id)=>({id,value}));
+ const hint=scoringHint(dice)!;expect(hint).toEqual({label:'Three pairs',points:1500,dice:[0,1,2,3,4,5]});
+ expect(score(dice.map(d=>d.value))).toBeNull();expect(score(hint.dice.map(id=>dice[id].value))).toBe(1500);
+});

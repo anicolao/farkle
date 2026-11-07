@@ -4,7 +4,9 @@ Seven-dice push-your-luck, against a straightforward heuristic companion. Svelte
 Threlte and Three.js; the rounded ruby dice, walnut, brass, maple and teal felt
 follow [Can’t Stop](https://github.com/anicolao/cantstop). Tap the actual 3D dice
 or use the visible keyboard-accessible dice buttons, keep a scoring subset, then
-bank or roll again. Games resume with the same anonymous browser identity.
+bank or roll again. Scoring suggestions can select a legal subset, including
+three pairs even when the roll contains no 1s or 5s. Games resume with the same
+anonymous browser identity.
 
 ## Development
 
@@ -59,7 +61,12 @@ The dedicated Firebase project is **farkle-game-anicolao**, with Firestore in
 `northamerica-northeast2` and anonymous Auth. The ordered, versioned intent log
 is canonical. Scores, dice, winners and turns are derived, never persisted.
 See [the protocol](docs/PROTOCOL.md). History shows every committed choice;
-download JSON or open it for read-only replay. Each preview has an independent
+download JSON or open it for read-only replay. The URL identifies the game with
+`?table=<game-id>`; an explicit table URL takes precedence over the saved device
+preference. Existing games acquire their URL on reload. Table links identify a
+private game and do not grant another anonymous identity access. The save status
+reports server-confirmed Firebase actions, pending writes, or cached/offline data.
+Each preview has an independent
 Firestore namespace. Local storage contains only the current game ID.
 
 This is a trusted-client, single-human-versus-companion game. The owner’s tab

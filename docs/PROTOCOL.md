@@ -59,3 +59,17 @@ ordering alone cannot prove a player intended to roll. The documented recognitio
 prototype originally targeted one to six dice; seven-die reliability needs
 hardware validation. Farkle remains Firestore-backed even if a future adapter
 reads DiceTower's external stream.
+
+## Table identity and save status
+
+The browser URL uses `?table=<UUID>`. On startup an explicit URL takes precedence
+over the device's last-table preference. Existing device-only IDs migrate to
+the URL without allocating a new game or changing the log. A malformed table
+parameter fails visibly. Ownership still belongs to the original anonymous UID;
+a table URL does not grant access to another identity.
+
+The event listener includes Firestore metadata updates. `Saved to Firebase` is
+shown only for server-backed snapshots with no pending writes. Pending snapshots
+do not replace the displayed committed log. Cached snapshots are labelled as
+cached/offline, and listener/write failures show an error. Metadata-only changes
+do not clear a player's in-progress dice selection.

@@ -1,6 +1,7 @@
 import {collection,doc,onSnapshot,orderBy,query,runTransaction,type Firestore} from 'firebase/firestore';
 import {connectFirebase,previewScope} from '../firebase';
 import {apply,replay,type Action,type Event} from './engine';
+export type SyncStatus={fromCache:boolean;pendingWrites:boolean};
 export class GameRepository {
  constructor(readonly db:Firestore,readonly uid:string){}
  table(id:string){return doc(this.db,'spaces',previewScope,'games',id);}
@@ -8,7 +9,15 @@ export class GameRepository {
   const id=crypto.randomUUID(),table=this.table(id);const event:Event={id:crypto.randomUUID(),revision:0,actor:0,action:{type:'begin',protocol:1,source:'digital',seed}};
   replay([event]);await runTransaction(this.db,async tx=>{tx.set(table,{owner:this.uid,revision:0,lastEvent:event.id});tx.set(doc(collection(table,'events'),event.id),event);});return id;
  }
- watch(id:string,update:(events:Event[])=>void,error:(e:Error)=>void){return onSnapshot(query(collection(this.table(id),'events'),orderBy('revision')),snapshot=>{if(!snapshot.empty)update(snapshot.docs.map(d=>d.data() as Event));},error);}
+ watch(id:string,update:(events:Event[])=>void,error:(e:Error)=>void,status:(status:SyncStatus)=>void=()=>{}){
+  let lastRevision=-1;
+  return onSnapshot(query(collection(this.table(id),'events'),orderBy('revision')),{includeMetadataChanges:true},snapshot=>{
+   status({fromCache:snapshot.metadata.fromCache,pendingWrites:snapshot.metadata.hasPendingWrites});
+   if(snapshot.metadata.hasPendingWrites)return;
+   if(!snapshot.empty){const events=snapshot.docs.map(d=>d.data() as Event);const revision=events.at(-1)!.revision;if(revision!==lastRevision){lastRevision=revision;update(events);}}
+   else if(!snapshot.metadata.fromCache)error(Error('This game has no recorded actions. Check the table link or start a new game.'));
+  },error);
+ }
  async append(id:string,events:Event[],action:Action,eventId=crypto.randomUUID()){
   const state=replay(events);apply(state,action,state.active);const event:Event={id:eventId,revision:events.length,actor:state.active,action};const table=this.table(id),ref=doc(collection(table,'events'),event.id);
   await runTransaction(this.db,async tx=>{

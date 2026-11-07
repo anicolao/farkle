@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 import {type Event} from '../src/game/engine';
-async function seeded(page:Page){await page.goto('/');await expect(page.getByRole('button',{name:'Play a companion'})).toBeEnabled();await page.evaluate(async()=>{const {repository}=await import('/src/game/repository.ts' as string);const repo=await repository();const id=await repo.create(42);localStorage.setItem('farkle:e2e',id);});await page.reload();await expect(page.getByRole('button',{name:'Roll 7 dice'})).toBeVisible();}
+async function seeded(page:Page,seed=42){await page.goto('/');await expect(page.getByRole('button',{name:'Play a companion'})).toBeEnabled();await page.evaluate(async(seed)=>{const {repository}=await import('/src/game/repository.ts' as string);const repo=await repository();const id=await repo.create(seed);localStorage.setItem('farkle:e2e',id);},seed);await page.goto('/');await expect(page.getByRole('button',{name:'Roll 7 dice'})).toBeVisible();}
 test('digital dice select, bank, companion, reload and log export',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await seeded(page);
  await page.getByRole('button',{name:'Roll 7 dice',exact:true}).click();await expect(page.getByRole('button',{name:/Die 1:/})).toBeVisible();
@@ -36,4 +36,38 @@ test('downloaded intent format opens as a read-only replay and rejects corruptio
  await input.setInputFiles({name:'game.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'farkle-intents',events}))});
  await expect(page.getByText('Read-only action log',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:/Die 1:/})).toBeDisabled();
  await page.getByRole('button',{name:'History & rules'}).click();await page.locator('input[type=file]').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'farkle-intents',events:[events[1]]}))});await expect(page.getByRole('alert')).toContainText('Invalid event order');await expect(page.getByText('Read-only action log',{exact:true})).toBeVisible();
+});
+
+test('three-pair opening without 1s or 5s offers a scoring selection and saves it',async({page})=>{
+ await seeded(page,78);await expect(page.getByRole('status')).toContainText('Saved to Firebase · 1 actions');
+ await expect(page).toHaveURL(/\?table=[0-9a-f-]+$/);const tableLink=page.url();
+ await page.getByRole('button',{name:'Roll 7 dice',exact:true}).click();
+ await page.getByRole('button',{name:'Select three pairs · 1,500',exact:true}).click();
+ await expect(page.locator('.dice-keys button[aria-pressed=true]')).toHaveCount(6);
+ await page.getByRole('button',{name:'Keep 1500 points',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Bank 1500',exact:true})).toBeVisible();
+ await expect(page.getByRole('status')).toContainText('Saved to Firebase · 3 actions');
+ await page.screenshot({path:'artifacts/scoring-and-save.png'});
+ // URL takes precedence over the old device preference, and reload resumes the log.
+ await page.evaluate(()=>localStorage.setItem('farkle:e2e','00000000-0000-0000-0000-000000000000'));
+ await page.goto(tableLink);await expect(page.getByRole('button',{name:'Bank 1500',exact:true})).toBeVisible();
+ await expect(page.getByRole('status')).toContainText('Saved to Firebase · 3 actions');
+ await page.setViewportSize({width:390,height:844});await expect(page.locator('body')).toHaveJSProperty('scrollWidth',390);
+});
+
+test('a real farkle has an enabled pass action and the companion hands back the turn',async({page})=>{
+ await seeded(page,96);await page.getByRole('button',{name:'Roll 7 dice',exact:true}).click();await page.getByRole('button',{name:/Die 1:/}).click();await page.getByRole('button',{name:/Keep \d+ points/}).click();await page.getByRole('button',{name:'Roll 6 again',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Farkle!',exact:true})).toBeVisible();await expect(page.getByText('No scoring dice. Pass the dice to continue.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Pass the dice',exact:true}).click();
+ await expect(page.getByText('COMPANION’S TURN',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Roll 7 dice',exact:true})).toBeVisible({timeout:20000});await expect(page.getByRole('status')).toContainText('Saved to Firebase');
+});
+
+test('save status waits for Firestore acknowledgment before reporting success',async({page})=>{
+ await seeded(page);await expect(page.getByRole('status')).toContainText('Saved to Firebase · 1 actions');
+ let acknowledge=()=>{};const gate=new Promise<void>(resolve=>acknowledge=resolve);
+ await page.route('**/documents:commit*',async route=>{await gate;await route.continue();});
+ await page.getByRole('button',{name:'Roll 7 dice',exact:true}).click();
+ await expect(page.getByRole('status')).toHaveText('Saving to Firebase…');
+ await expect(page.getByRole('button',{name:'Roll 7 dice',exact:true})).toBeDisabled();
+ acknowledge();await expect(page.getByRole('status')).toContainText('Saved to Firebase · 2 actions');
+ await page.unroute('**/documents:commit*');
 });
